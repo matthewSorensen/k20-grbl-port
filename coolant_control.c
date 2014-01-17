@@ -23,39 +23,39 @@
 #include "config.h"
 #include "planner.h"
 
-#include <avr/io.h>
-
-static uint8_t current_coolant_mode;
+static uint32_t current_coolant_mode;
 
 void coolant_init()
 {
   current_coolant_mode = COOLANT_DISABLE;
   #if ENABLE_M7
-    COOLANT_MIST_DDR |= (1 << COOLANT_MIST_BIT);
+    COOLANT_MIST_CTRL = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+    COOLANT_DDR |= COOlANT_MIST_BIT;
   #endif
-  COOLANT_FLOOD_DDR |= (1 << COOLANT_FLOOD_BIT);
+  COOLANT_FLOOD_CTRL = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+  COOLANT_DDR |= COOLANT_FLOOD_BIT;
   coolant_stop();
 }
 
 void coolant_stop()
 {
   #ifdef ENABLE_M7
-    COOLANT_MIST_PORT &= ~(1 << COOLANT_MIST_BIT);
+    COOLANT_PORT(COR) = COOLANT_MIST_BIT;
   #endif
-  COOLANT_FLOOD_PORT &= ~(1 << COOLANT_FLOOD_BIT);
+  COOLANT_PORT(COR) = COOLANT_FLOOD_BIT;
 }
 
 
-void coolant_run(uint8_t mode)
+void coolant_run(uint32_t mode)
 {
   if (mode != current_coolant_mode)
   { 
     plan_synchronize(); // Ensure coolant turns on when specified in program.
     if (mode == COOLANT_FLOOD_ENABLE) { 
-      COOLANT_FLOOD_PORT |= (1 << COOLANT_FLOOD_BIT);
+      COOLANT_PORT(SOR) = COOLANT_FLOOD_BIT;
     #ifdef ENABLE_M7  
       } else if (mode == COOLANT_MIST_ENABLE) {
-          COOLANT_MIST_PORT |= (1 << COOLANT_MIST_BIT);
+          COOLANT_PORT(SOR) = COOLANT_MIST_BIT;
     #endif
     } else {
       coolant_stop();
