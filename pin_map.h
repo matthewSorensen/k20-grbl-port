@@ -40,4 +40,30 @@
 #define COOLANT_MIST_CTRL  PORTD_PCR4
 #define COOLANT_MIST_BIT   (1<<4)
 
+
+#define STEPPER_DISABLE_PORT(reg) GPIOC_P##reg
+#define STEPPER_DISABLE_DDR       GPIOC_PDDR
+#define STEPPER_DISABLE_CRTL      PORTC_PCR1
+#define STEPPER_DISABLE_BIT       2
+
+#define STEPPER_PORT(reg) GPIOC_P##reg
+#define STEPPER_DDR GPIOC_PDDR
+
+#define STEP_X_CTRL PORTC_PCR3
+#define STEP_X_BIT  (1<<3)
+#define STEP_Y_CTRL PORTC_PCR4
+#define STEP_Y_BIT  (1<<4)
+#define STEP_Z_CTRL PORTC_PCR6
+#define STEP_Z_BIT  (1<<6)
+
+#define DIR_X_CTRL PORTC_PCR7
+#define DIR_X_BIT  (1<<7)
+#define DIR_Y_CTRL PORTC_PCR5
+#define DIR_Y_BIT  (1<<5)
+#define DIR_Z_CTRL PORTC_PCR0
+#define DIR_Z_BIT  1
+
+#define DIRECTION_MASK (DIR_X_BIT | DIR_Y_BIT | DIR_Z_BIT)
+#define STEP_MASK (STEP_X_BIT | STEP_Y_BIT | STEP_Z_BIT)
+
 #endif
