@@ -19,9 +19,6 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
   
-#include <util/delay.h>
-#include <avr/io.h>
-#include <avr/interrupt.h>
 #include "stepper.h"
 #include "settings.h"
 #include "nuts_bolts.h"
@@ -33,23 +30,29 @@
 #include "limits.h"
 #include "report.h"
 
+#include <mk20dx128.h>
+#include <pin_config.h>                  
+
 #define MICROSECONDS_PER_ACCELERATION_TICK  (1000000/ACCELERATION_TICKS_PER_SECOND)
 
 void limits_init() 
 {
-  LIMIT_DDR &= ~(LIMIT_MASK); // Set as input pins
+  uint32_t config_reg;
+  LIMIT_DDR &= ~(LIMITS_MASK); // Set as input pins
+
   #ifndef LIMIT_SWITCHES_ACTIVE_HIGH
-    LIMIT_PORT |= (LIMIT_MASK); // Enable internal pull-up resistors. Normal high operation.
-  #else // LIMIT_SWITCHES_ACTIVE_HIGH
-    LIMIT_PORT &= ~(LIMIT_MASK); // Normal low operation. Requires external pull-down.
-  #endif // !LIMIT_SWITCHES_ACTIVE_HIGH
+  config_reg = PULL_UP | MUX_GPIO;
+  #else
+  config_reg = PULL_DOWN | MUX_GPIO;
+  #endif
   if (bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE)) {
-    LIMIT_PCMSK |= LIMIT_MASK; // Enable specific pins of the Pin Change Interrupt
-    PCICR |= (1 << LIMIT_INT); // Enable Pin Change Interrupt
-  } else {
-    LIMIT_PCMSK &= ~LIMIT_MASK; // Disable
-    PCICR &= ~(1 << LIMIT_INT); 
+    config_reg |= IRQC_EITHER_EDGE; 
   }
+  
+  LIMIT_X_CTRL = config_reg;
+  LIMIT_Y_CTRL = config_reg;
+  LIMIT_Z_CTRL = config_reg;
+
 }
 
 // This is the Limit Pin Change Interrupt, which handles the hard limit feature. A bouncing 
@@ -61,8 +64,7 @@ void limits_init()
 // homing cycles and will not respond correctly. Upon user request or need, there may be a
 // special pinout for an e-stop, but it is generally recommended to just directly connect
 // your e-stop switch to the Arduino reset pin, since it is the most correct way to do this.
-ISR(LIMIT_INT_vect) 
-{
+void portb_isr(void){
   // TODO: This interrupt may be used to manage the homing cycle directly with the main stepper
   // interrupt without adding too much to it. All it would need is some way to stop one axis 
   // when its limit is triggered and continue the others. This may reduce some of the code, but
@@ -74,10 +76,18 @@ ISR(LIMIT_INT_vect)
   // moves in the planner and serial buffers are all cleared and newly sent blocks will be 
   // locked out until a homing cycle or a kill lock command. Allows the user to disable the hard
   // limit setting if their limits are constantly triggering after a reset and move their axes.
-  if (sys.state != STATE_ALARM) { 
-    if (bit_isfalse(sys.execute,EXEC_ALARM)) {
-      mc_reset(); // Initiate system kill.
-      sys.execute |= EXEC_CRIT_EVENT; // Indicate hard limit critical event
+  if(PORTB_ISFR & LIMITS_MASK){
+    // We don't care about which pin actually did anything, just that something happened.
+    // Seems pointless, but the write resets the flag
+    if(LIMIT_X_CTRL & ISF) LIMIT_X_CTRL |= ISF;
+    if(LIMIT_Y_CTRL & ISF) LIMIT_Y_CTRL |= ISF;
+    if(LIMIT_Z_CTRL & ISF) LIMIT_Z_CTRL |= ISF;
+    
+    if (sys.state != STATE_ALARM) { 
+      if (bit_isfalse(sys.execute,EXEC_ALARM)) {
+	mc_reset(); // Initiate system kill.
+	sys.execute |= EXEC_CRIT_EVENT; // Indicate hard limit critical event
+      }
     }
   }
 }
@@ -146,7 +156,7 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
   if (dt > dt_min) { dt = dt_min; } // Disable acceleration for very slow rates.
       
   // Set default out_bits. 
-  uint8_t out_bits0 = settings.invert_mask;
+  uint32_t out_bits0 = settings.invert_mask;
   out_bits0 ^= (settings.homing_dir_mask & DIRECTION_MASK); // Apply homing direction settings
   if (!pos_dir) { out_bits0 ^= DIRECTION_MASK; }   // Invert bits, if negative dir.
   
@@ -157,23 +167,23 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
   uint32_t step_delay = dt-settings.pulse_microseconds;  // Step delay after pulse
   uint32_t step_rate = 0;  // Tracks step rate. Initialized from 0 rate. (in step/min)
   uint32_t trap_counter = MICROSECONDS_PER_ACCELERATION_TICK/2; // Acceleration trapezoid counter
-  uint8_t out_bits;
-  uint8_t limit_state;
+  uint32_t out_bits;
+  uint32_t limit_state;
   for(;;) {
   
     // Reset out bits. Both direction and step pins appropriately inverted and set.
     out_bits = out_bits0;
     
     // Get limit pin state.
-    limit_state = LIMIT_PIN;
-    if (invert_pin) { limit_state ^= LIMIT_MASK; } // If leaving switch, invert to move.
+    limit_state = LIMIT_PORT(DIR);
+    if (invert_pin) { limit_state ^= LIMITS_MASK; } // If leaving switch, invert to move.
     
     // Set step pins by Bresenham line algorithm. If limit switch reached, disable and
     // flag for completion.
     if (cycle_mask & (1<<X_AXIS)) {
       counter_x += steps[X_AXIS];
       if (counter_x > 0) {
-        if (limit_state & (1<<X_LIMIT_BIT)) { out_bits ^= (1<<X_STEP_BIT); }
+        if (limit_state & LIMIT_X_BIT) { out_bits ^= STEP_X_BIT; }
         else { cycle_mask &= ~(1<<X_AXIS); }
         counter_x -= step_event_count;
       }
@@ -181,7 +191,7 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
     if (cycle_mask & (1<<Y_AXIS)) {
       counter_y += steps[Y_AXIS];
       if (counter_y > 0) {
-        if (limit_state & (1<<Y_LIMIT_BIT)) { out_bits ^= (1<<Y_STEP_BIT); }
+        if (limit_state & LIMIT_Y_BIT) { out_bits ^= STEP_Y_BIT; }
         else { cycle_mask &= ~(1<<Y_AXIS); }
         counter_y -= step_event_count;
       }
@@ -189,7 +199,7 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
     if (cycle_mask & (1<<Z_AXIS)) {
       counter_z += steps[Z_AXIS];
       if (counter_z > 0) {
-        if (limit_state & (1<<Z_LIMIT_BIT)) { out_bits ^= (1<<Z_STEP_BIT); }
+        if (limit_state & LIMIT_Z_BIT) { out_bits ^= STEP_Z_BIT; }
         else { cycle_mask &= ~(1<<Z_AXIS); }
         counter_z -= step_event_count;
       }
@@ -199,11 +209,13 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
     if (!(cycle_mask) || (sys.execute & EXEC_RESET)) { return; }
         
     // Perform step.
-    STEPPING_PORT = (STEPPING_PORT & ~STEP_MASK) | (out_bits & STEP_MASK);
+    // Set the direction pins a couple of nanoseconds before we step the steppers
+    STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
     delay_us(settings.pulse_microseconds);
-    STEPPING_PORT = out_bits0;
+    STEPPER_PORT(COR) = STEP_MASK;
+    STEPPER_PORT(SOR) = out_bits;
     delay_us(step_delay);
-    
+
     // Track and set the next step delay, if required. This routine uses another Bresenham
     // line algorithm to follow the constant acceleration line in the velocity and time 
     // domain. This is a lite version of the same routine used in the main stepper program.

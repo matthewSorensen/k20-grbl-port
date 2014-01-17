@@ -19,7 +19,6 @@
 # User configurable firmware setting:
 CLOCK = 48000000
 
-
 TEENSY_PATH = /home/matthew/498/teensy-toolchain
 COMPILER = $(TEENSY_PATH)/hardware/tools/arm-none-eabi/bin
 VENDOR = /home/matthew/498/porting-grbl/vendor

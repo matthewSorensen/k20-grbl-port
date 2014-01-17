@@ -66,4 +66,24 @@
 #define DIRECTION_MASK (DIR_X_BIT | DIR_Y_BIT | DIR_Z_BIT)
 #define STEP_MASK (STEP_X_BIT | STEP_Y_BIT | STEP_Z_BIT)
 
+
+
+#define STEPPER_DISABLE_PORT(reg) GPIOC_P##reg
+#define STEPPER_DISABLE_DDR       GPIOC_PDDR
+#define STEPPER_DISABLE_CTRL      PORTC_PCR1
+#define STEPPER_DISABLE_BIT       2
+
+
+#define LIMIT_PORT(reg) GPIOB_P##reg
+#define LIMIT_DDR       GPIOB_PDDR
+
+#define LIMIT_X_CTRL PORTB_PCR0
+#define LIMIT_X_BIT  1
+#define LIMIT_Y_CTRL PORTB_PCR1
+#define LIMIT_Y_BIT  2
+#define LIMIT_Z_CTRL PORTB_PCR3
+#define LIMIT_Z_BIT  (1<<3)
+
+#define LIMITS_MASK (3 | (1<<3))
+
 #endif
