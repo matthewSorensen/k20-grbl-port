@@ -370,7 +370,7 @@ static void set_step_events_per_minute(uint32_t steps_per_minute)
   if (steps_per_minute < MINIMUM_STEPS_PER_MINUTE){
     steps_per_minute = MINIMUM_STEPS_PER_MINUTE;
   }
-  st.cycles_per_step_event = config_step_timer((F_CPU*60)/steps_per_minute);
+  st.cycles_per_step_event = config_step_timer((F_CPU*((uint32_t)60))/steps_per_minute);
 }
 
 // Planner external interface to start stepper interrupt and execute the blocks in queue. Called
