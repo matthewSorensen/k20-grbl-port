@@ -23,32 +23,31 @@
 #include "spindle_control.h"
 #include "planner.h"
 
-static uint8_t current_direction;
+static uint32_t current_direction;
 
 void spindle_init()
 {
   current_direction = 0;
-  SPINDLE_ENABLE_DDR |= (1<<SPINDLE_ENABLE_BIT);
-  SPINDLE_DIRECTION_DDR |= (1<<SPINDLE_DIRECTION_BIT);  
+  SPINDLE_DDR |=  SPINDLE_ENABLE_BIT | SPINDLE_DIRECTION_BIT;
   spindle_stop();
 }
 
 void spindle_stop()
 {
-  SPINDLE_ENABLE_PORT &= ~(1<<SPINDLE_ENABLE_BIT);
+  SPINDLE_PORT(COR) = SPINDLE_ENABLE_BIT;
 }
 
-void spindle_run(int8_t direction) //, uint16_t rpm) 
+void spindle_run(int32_t direction)
 {
   if (direction != current_direction) {
     plan_synchronize();
     if (direction) {
       if(direction > 0) {
-        SPINDLE_DIRECTION_PORT &= ~(1<<SPINDLE_DIRECTION_BIT);
+	SPINDLE_PORT(COR) = SPINDLE_DIRECTION_BIT;
       } else {
-        SPINDLE_DIRECTION_PORT |= 1<<SPINDLE_DIRECTION_BIT;
+	SPINDLE_PORT(SOR) = SPINDLE_DIRECTION_BIT;
       }
-      SPINDLE_ENABLE_PORT |= 1<<SPINDLE_ENABLE_BIT;
+      SPINDLE_PORT(SOR) = SPINDLE_ENABLE_BIT;
     } else {
       spindle_stop();     
     }
