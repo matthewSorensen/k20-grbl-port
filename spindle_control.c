@@ -22,6 +22,7 @@
 #include "settings.h"
 #include "spindle_control.h"
 #include "planner.h"
+#include <pin_config.h>
 
 static uint32_t current_direction;
 
@@ -29,8 +30,8 @@ void spindle_init()
 {
   current_direction = 0;
   
-  SPINDLE_ENABLE_CTRL = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
-  SPINDLE_DIRECTION_CRL = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+  SPINDLE_ENABLE_CTRL = STANDARD_GPIO;
+  SPINDLE_DIRECTION_CRL = STANDARD_GPIO;
 
   SPINDLE_DDR |=  SPINDLE_ENABLE_BIT | SPINDLE_DIRECTION_BIT;
   spindle_stop();

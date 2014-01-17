@@ -23,16 +23,18 @@
 #include "config.h"
 #include "planner.h"
 
+#include <pin_config.h>
+
 static uint32_t current_coolant_mode;
 
 void coolant_init()
 {
   current_coolant_mode = COOLANT_DISABLE;
   #if ENABLE_M7
-    COOLANT_MIST_CTRL = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+    COOLANT_MIST_CTRL = STANDARD_GPIO;
     COOLANT_DDR |= COOlANT_MIST_BIT;
   #endif
-  COOLANT_FLOOD_CTRL = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+  COOLANT_FLOOD_CTRL = STANDARD_GPIO;
   COOLANT_DDR |= COOLANT_FLOOD_BIT;
   coolant_stop();
 }
