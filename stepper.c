@@ -29,6 +29,7 @@
 
 #include <mk20dx128.h>
 #include <pin_config.h>                  
+#include <util.h>
 
 // Some useful constants
 #define TICKS_PER_MICROSECOND (F_CPU/1000000)
@@ -111,7 +112,7 @@ void st_go_idle()
   if ((settings.stepper_idle_lock_time != 0xff) || bit_istrue(sys.execute,EXEC_ALARM)) {
     // Force stepper dwell to lock axes for a defined amount of time to ensure the axes come to a complete
     // stop and not drift from residual inertial forces at the end of the last movement.
-    delay_ms(settings.stepper_idle_lock_time);
+    delay(settings.stepper_idle_lock_time);
     if (bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE)) { 
       STEPPER_DISABLE_PORT(COR) = STEPPER_DISABLE_BIT;
     }else{

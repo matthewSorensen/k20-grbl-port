@@ -32,6 +32,7 @@
 
 #include <mk20dx128.h>
 #include <pin_config.h>                  
+#include <util.h>
 
 #define MICROSECONDS_PER_ACCELERATION_TICK  (1000000/ACCELERATION_TICKS_PER_SECOND)
 
@@ -211,10 +212,10 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
     // Perform step.
     // Set the direction pins a couple of nanoseconds before we step the steppers
     STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
-    delay_us(settings.pulse_microseconds);
+    delay_microseconds(settings.pulse_microseconds);
     STEPPER_PORT(COR) = STEP_MASK;
     STEPPER_PORT(SOR) = out_bits;
-    delay_us(step_delay);
+    delay_microseconds(step_delay);
 
     // Track and set the next step delay, if required. This routine uses another Bresenham
     // line algorithm to follow the constant acceleration line in the velocity and time 
@@ -246,7 +247,7 @@ void limits_go_home()
   #ifdef HOMING_SEARCH_CYCLE_2
     homing_cycle(HOMING_SEARCH_CYCLE_2, true, false, settings.homing_seek_rate);  // Search cycle 2
   #endif
-  delay_ms(settings.homing_debounce_delay); // Delay to debounce signal
+  delay(settings.homing_debounce_delay); // Delay to debounce signal
     
   // Now in proximity of all limits. Carefully leave and approach switches in multiple cycles
   // to precisely hone in on the machine zero location. Moves at slower homing feed rate.
@@ -254,12 +255,12 @@ void limits_go_home()
   while (n_cycle--) {
     // Leave all switches to release them. After cycles complete, this is machine zero.
     homing_cycle(HOMING_LOCATE_CYCLE, false, true, settings.homing_feed_rate);
-    delay_ms(settings.homing_debounce_delay);
+    delay(settings.homing_debounce_delay);
     
     if (n_cycle > 0) {
       // Re-approach all switches to re-engage them.
       homing_cycle(HOMING_LOCATE_CYCLE, true, false, settings.homing_feed_rate);
-      delay_ms(settings.homing_debounce_delay);
+      delay(settings.homing_debounce_delay);
     }
   }
 

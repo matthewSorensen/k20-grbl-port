@@ -19,7 +19,7 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <util/delay.h>
+#include <util.h>
 #include "nuts_bolts.h"
 #include "gcode.h"
 #include "planner.h"
@@ -106,37 +106,6 @@ int read_float(char *line, uint8_t *char_counter, float *float_ptr)
   *char_counter = ptr - line - 1; // Set char_counter to next statement
   
   return(true);
-}
-
-
-// Delays variable defined milliseconds. Compiler compatibility fix for _delay_ms(),
-// which only accepts constants in future compiler releases.
-void delay_ms(uint16_t ms) 
-{
-  while ( ms-- ) { _delay_ms(1); }
-}
-
-
-// Delays variable defined microseconds. Compiler compatibility fix for _delay_us(),
-// which only accepts constants in future compiler releases. Written to perform more 
-// efficiently with larger delays, as the counter adds parasitic time in each iteration.
-void delay_us(uint32_t us) 
-{
-  while (us) {
-    if (us < 10) { 
-      _delay_us(1);
-      us--;
-    } else if (us < 100) {
-      _delay_us(10);
-      us -= 10;
-    } else if (us < 1000) {
-      _delay_us(100);
-      us -= 100;
-    } else {
-      _delay_ms(1);
-      us -= 1000;
-    }
-  }
 }
 
 // Syncs all internal position vectors to the current system position.
