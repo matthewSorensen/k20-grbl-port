@@ -46,14 +46,24 @@ void limits_init()
   #else
   config_reg = PULL_DOWN | MUX_GPIO;
   #endif
-  if (bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE)) {
-    config_reg |= IRQC_EITHER_EDGE; 
-  }
   
   LIMIT_X_CTRL = config_reg;
   LIMIT_Y_CTRL = config_reg;
   LIMIT_Z_CTRL = config_reg;
 
+  toggle_hard_limits(true);
+}
+ 
+void toggle_hard_limits(uint32_t enable){
+  if(enable && bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE)){
+    LIMIT_X_CTRL = (LIMIT_X_CTRL & ~ IRQC_MASK) | IRQC_EITHER_EDGE;
+    LIMIT_X_CTRL = (LIMIT_Z_CTRL & ~ IRQC_MASK) | IRQC_EITHER_EDGE;
+    LIMIT_X_CTRL = (LIMIT_Y_CTRL & ~ IRQC_MASK) | IRQC_EITHER_EDGE;
+  }else{
+    LIMIT_X_CTRL &= ~IRQC_MASK;
+    LIMIT_Y_CTRL &= ~IRQC_MASK;
+    LIMIT_Z_CTRL &= ~IRQC_MASK;
+  }
 }
 
 // This is the Limit Pin Change Interrupt, which handles the hard limit feature. A bouncing 

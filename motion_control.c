@@ -20,10 +20,10 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <avr/io.h>
-#include <util/delay.h>
 #include <math.h>
 #include <stdlib.h>
+#include <util.h>
+
 #include "settings.h"
 #include "config.h"
 #include "gcode.h"
@@ -199,12 +199,12 @@ void mc_dwell(float seconds)
 {
    uint16_t i = floor(1000/DWELL_TIME_STEP*seconds);
    plan_synchronize();
-   delay_ms(floor(1000*seconds-i*DWELL_TIME_STEP)); // Delay millisecond remainder
+   delay(floor(1000*seconds-i*DWELL_TIME_STEP)); // Delay millisecond remainder
    while (i-- > 0) {
      // NOTE: Check and execute runtime commands during dwell every <= DWELL_TIME_STEP milliseconds.
      protocol_execute_runtime();
      if (sys.abort) { return; }
-     _delay_ms(DWELL_TIME_STEP); // Delay DWELL_TIME_STEP increment
+     delay(DWELL_TIME_STEP); // Delay DWELL_TIME_STEP increment
    }
 }
 
@@ -215,7 +215,7 @@ void mc_dwell(float seconds)
 void mc_go_home()
 {
   sys.state = STATE_HOMING; // Set system state variable
-  LIMIT_PCMSK &= ~LIMIT_MASK; // Disable hard limits pin change register for cycle duration
+  toggle_hard_limits(false); // Disable hard limits pin change register for cycle duration
   
   limits_go_home(); // Perform homing routine.
 
@@ -234,15 +234,15 @@ void mc_go_home()
   int8_t x_dir, y_dir, z_dir;
   x_dir = y_dir = z_dir = 0;
   if (HOMING_LOCATE_CYCLE & (1<<X_AXIS)) { 
-    if (settings.homing_dir_mask & (1<<X_DIRECTION_BIT)) { x_dir = 1; }
+    if (settings.homing_dir_mask & DIR_X_BIT) { x_dir = 1; }
     else { x_dir = -1; }
   }
   if (HOMING_LOCATE_CYCLE & (1<<Y_AXIS)) { 
-    if (settings.homing_dir_mask & (1<<Y_DIRECTION_BIT)) { y_dir = 1; }
+    if (settings.homing_dir_mask & DIR_Y_BIT) { y_dir = 1; }
     else { y_dir = -1; }
   }
   if (HOMING_LOCATE_CYCLE & (1<<Z_AXIS)) { 
-    if (settings.homing_dir_mask & (1<<Z_DIRECTION_BIT)) { z_dir = 1; }
+    if (settings.homing_dir_mask & DIR_Z_BIT) { z_dir = 1; }
     else { z_dir = -1; }
   }
   mc_line(x_dir*settings.homing_pulloff, y_dir*settings.homing_pulloff, 
@@ -252,9 +252,8 @@ void mc_go_home()
   
   // The gcode parser position circumvented by the pull-off maneuver, so sync position vectors.
   sys_sync_current_position();
-
   // If hard limits feature enabled, re-enable hard limits pin change register after homing cycle.
-  if (bit_istrue(settings.flags,BITFLAG_HARD_LIMIT_ENABLE)) { LIMIT_PCMSK |= LIMIT_MASK; }
+  toggle_hard_limits(true);
   // Finished! 
 }
 

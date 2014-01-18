@@ -23,7 +23,8 @@
 
 // initialize the limits module
 void limits_init();
-
+// True enables hard limits, if the current settings allow for that
+void toggle_hard_limits(uint32_t);
 // perform the homing cycle
 void limits_go_home();
 
