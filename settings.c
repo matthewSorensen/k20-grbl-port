@@ -19,68 +19,53 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <avr/io.h>
 #include "protocol.h"
 #include "report.h"
 #include "stepper.h"
 #include "nuts_bolts.h"
 #include "settings.h"
-#include "eeprom.h"
 #include "limits.h"
 
 settings_t settings;
 
-// Version 4 outdated settings record
-typedef struct {
-  float steps_per_mm[3];
-  uint8_t microsteps;
-  uint8_t pulse_microseconds;
-  float default_feed_rate;
-  float default_seek_rate;
-  uint8_t invert_mask;
-  float mm_per_arc_segment;
-  float acceleration;
-  float junction_deviation;
-} settings_v4_t;
-
+#include <flexram.h>
 
 // Method to store startup lines into EEPROM
 void settings_store_startup_line(uint8_t n, char *line)
 {
-  uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
-  memcpy_to_eeprom_with_checksum(addr,(char*)line, LINE_BUFFER_SIZE);
+  uint32_t addr = n*(LINE_BUFFER_SIZE/4+1)+EEPROM_ADDR_STARTUP_BLOCK;
+  write_with_checksum((uint32_t*) line, addr, LINE_BUFFER_SIZE/4);
 }
 
 // Method to store coord data parameters into EEPROM
 void settings_write_coord_data(uint8_t coord_select, float *coord_data)
 {  
-  uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
-  memcpy_to_eeprom_with_checksum(addr,(char*)coord_data, sizeof(float)*N_AXIS);
+  uint32_t addr = coord_select*(N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+  write_with_checksum((uint32_t*) coord_data, addr, N_AXIS);
 }  
 
 // Method to store Grbl global settings struct and version number into EEPROM
 void write_global_settings() 
 {
-  eeprom_put_char(0, SETTINGS_VERSION);
-  memcpy_to_eeprom_with_checksum(EEPROM_ADDR_GLOBAL, (char*)&settings, sizeof(settings_t));
+  write_with_checksum((uint32_t*) &settings, EEPROM_ADDR_GLOBAL, (sizeof(settings_t)+3) >> 2);
 }
 
+
 // Method to reset Grbl global settings back to defaults. 
-void settings_reset(bool reset_all) {
+void settings_reset(void){
   // Reset all settings or only the migration settings to the new version.
-  if (reset_all) {
-    settings.steps_per_mm[X_AXIS] = DEFAULT_X_STEPS_PER_MM;
-    settings.steps_per_mm[Y_AXIS] = DEFAULT_Y_STEPS_PER_MM;
-    settings.steps_per_mm[Z_AXIS] = DEFAULT_Z_STEPS_PER_MM;
-    settings.pulse_microseconds = DEFAULT_STEP_PULSE_MICROSECONDS;
-    settings.default_feed_rate = DEFAULT_FEEDRATE;
-    settings.default_seek_rate = DEFAULT_RAPID_FEEDRATE;
-    settings.acceleration = DEFAULT_ACCELERATION;
-    settings.mm_per_arc_segment = DEFAULT_MM_PER_ARC_SEGMENT;
-    settings.invert_mask = DEFAULT_STEPPING_INVERT_MASK;
-    settings.junction_deviation = DEFAULT_JUNCTION_DEVIATION;
-  }
-  // New settings since last version
+  settings.version = SETTINGS_VERSION;
+  settings.steps_per_mm[X_AXIS] = DEFAULT_X_STEPS_PER_MM;
+  settings.steps_per_mm[Y_AXIS] = DEFAULT_Y_STEPS_PER_MM;
+  settings.steps_per_mm[Z_AXIS] = DEFAULT_Z_STEPS_PER_MM;
+  settings.pulse_microseconds = DEFAULT_STEP_PULSE_MICROSECONDS;
+  settings.default_feed_rate = DEFAULT_FEEDRATE;
+  settings.default_seek_rate = DEFAULT_RAPID_FEEDRATE;
+  settings.acceleration = DEFAULT_ACCELERATION;
+  settings.mm_per_arc_segment = DEFAULT_MM_PER_ARC_SEGMENT;
+  settings.invert_mask = DEFAULT_STEPPING_INVERT_MASK;
+  settings.junction_deviation = DEFAULT_JUNCTION_DEVIATION;
+  
   settings.flags = 0;
   if (DEFAULT_REPORT_INCHES) { settings.flags |= BITFLAG_REPORT_INCHES; }
   if (DEFAULT_AUTO_START) { settings.flags |= BITFLAG_AUTO_START; }
@@ -101,8 +86,8 @@ void settings_reset(bool reset_all) {
 // Reads startup line from EEPROM. Updated pointed line string data.
 uint8_t settings_read_startup_line(uint8_t n, char *line)
 {
-  uint16_t addr = n*(LINE_BUFFER_SIZE+1)+EEPROM_ADDR_STARTUP_BLOCK;
-  if (!(memcpy_from_eeprom_with_checksum((char*)line, addr, LINE_BUFFER_SIZE))) {
+  uint32_t addr = n*(LINE_BUFFER_SIZE/4+1)+EEPROM_ADDR_STARTUP_BLOCK; 
+  if(read_with_checksum((uint32_t*) line, addr, LINE_BUFFER_SIZE/4)){
     // Reset line with default value
     line[0] = 0;
     settings_store_startup_line(n, line);
@@ -115,39 +100,23 @@ uint8_t settings_read_startup_line(uint8_t n, char *line)
 // Read selected coordinate data from EEPROM. Updates pointed coord_data value.
 uint8_t settings_read_coord_data(uint8_t coord_select, float *coord_data)
 {
-  uint16_t addr = coord_select*(sizeof(float)*N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
-  if (!(memcpy_from_eeprom_with_checksum((char*)coord_data, addr, sizeof(float)*N_AXIS))) {
-    // Reset with default zero vector
-    clear_vector_float(coord_data); 
+  uint32_t addr = coord_select*(N_AXIS+1) + EEPROM_ADDR_PARAMETERS;
+  if(read_with_checksum((uint32_t*) coord_data, addr, N_AXIS)){
+    clear_vector_float(coord_data);
     settings_write_coord_data(coord_select,coord_data);
-    return(false);
-  } else {
-    return(true);
+    return (false);
+  }else{
+    return (true);
   }
 }  
 
 // Reads Grbl global settings struct from EEPROM.
-uint8_t read_global_settings() {
-  // Check version-byte of eeprom
-  uint8_t version = eeprom_get_char(0);
-  
-  if (version == SETTINGS_VERSION) {
-    // Read settings-record and check checksum
-    if (!(memcpy_from_eeprom_with_checksum((char*)&settings, EEPROM_ADDR_GLOBAL, sizeof(settings_t)))) {
-      return(false);
-    }
-  } else {
-    if (version <= 4) {
-      // Migrate from settings version 4 to current version.
-      if (!(memcpy_from_eeprom_with_checksum((char*)&settings, 1, sizeof(settings_v4_t)))) {
-        return(false);
-      }     
-      settings_reset(false); // Old settings ok. Write new settings only.
-    } else {      
-      return(false);
-    }
+uint8_t read_global_settings(void){
+  if(read_with_checksum((uint32_t*) &settings, EEPROM_ADDR_GLOBAL, (sizeof(settings_t)+3) >> 2)){
+    return false;
+  }else{
+    return true;
   }
-  return(true);
 }
 
 
@@ -206,7 +175,7 @@ uint8_t settings_store_global_setting(int parameter, float value) {
 void settings_init() {
   if(!read_global_settings()) {
     report_status_message(STATUS_SETTING_READ_FAIL);
-    settings_reset(true);
+    settings_reset();
     report_grbl_settings();
   }
   // Read all parameter data into a dummy variable. If error, reset to zero, otherwise do nothing.

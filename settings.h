@@ -23,13 +23,14 @@
 #define settings_h
 
 #include <math.h>
+#include <stdint.h>
 #include "nuts_bolts.h"
 
 #define GRBL_VERSION "0.8c"
 
 // Version of the EEPROM data. Will be used to migrate existing data from older versions of Grbl
-// when firmware is upgraded. Always stored in byte 0 of eeprom
-#define SETTINGS_VERSION 5
+// when firmware is upgraded. Always stored in word 1 of eeprom
+#define SETTINGS_VERSION 0
 
 // Define bit flag masks for the boolean settings in settings.flag.
 #define BITFLAG_REPORT_INCHES      bit(0)
@@ -42,9 +43,11 @@
 // NOTE: The Atmega328p has 1KB EEPROM. The upper half is reserved for parameters and
 // the startup script. The lower half contains the global settings and space for future 
 // developments.
-#define EEPROM_ADDR_GLOBAL 1
-#define EEPROM_ADDR_PARAMETERS 512
-#define EEPROM_ADDR_STARTUP_BLOCK 768
+
+// All of these are in 32-bit words, not bytes
+#define EEPROM_ADDR_GLOBAL 0
+#define EEPROM_ADDR_PARAMETERS 128
+#define EEPROM_ADDR_STARTUP_BLOCK 192
 
 // Define EEPROM address indexing for coordinate parameters
 #define N_COORDINATE_SYSTEM 6  // Number of supported work coordinate systems (from index 1)
@@ -56,6 +59,8 @@
 
 // Global persistent settings (Stored from byte EEPROM_ADDR_GLOBAL onwards)
 typedef struct {
+  uint32_t version;
+
   float steps_per_mm[3];
   uint8_t microsteps;
   uint8_t pulse_microseconds;
