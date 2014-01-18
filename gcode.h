@@ -21,7 +21,8 @@
 
 #ifndef gcode_h
 #define gcode_h
-#include <avr/io.h>
+
+#include <stdint.h>
 #include "nuts_bolts.h"
 
 // Define modal group internal numbers for checking multiple command violations and tracking the 
