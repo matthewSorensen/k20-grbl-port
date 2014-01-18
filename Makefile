@@ -24,7 +24,7 @@ COMPILER = $(TEENSY_PATH)/hardware/tools/arm-none-eabi/bin
 VENDOR = /home/matthew/498/porting-grbl/vendor
 
 
-CPPFLAGS = -Wall -g -Os -mcpu=cortex-m4 -mthumb -nostdlib -MMD -DF_CPU=$(CLOCK) -I$(VENDOR)
+CPPFLAGS = -Wall -g -Os -mcpu=cortex-m4 -mthumb -nostdlib -MMD -DF_CPU=$(CLOCK) -DUSB_SERIAL -I$(VENDOR)
 CXXFLAGS = -std=gnu++0x -felide-constructors -fno-exceptions -fno-rtti
 CFLAGS =
 LDFLAGS = -Os -Wl,--gc-sections -mcpu=cortex-m4 -mthumb -T$(VENDOR)/mk20dx128.ld
@@ -35,20 +35,21 @@ OBJCOPY = $(COMPILER)/arm-none-eabi-objcopy
 SIZE = $(COMPILER)/arm-none-eabi-size
 
 
-OBJECTS    = main.o motion_control.o gcode.o spindle_control.o coolant_control.o serial.o \
-             protocol.o stepper.o eeprom.o settings.o planner.o nuts_bolts.o limits.o \
+OBJECTS    = main.o motion_control.o gcode.o spindle_control.o coolant_control.o \
+             protocol.o stepper.o settings.o planner.o nuts_bolts.o limits.o \
              print.o report.o
 
-VENDOR_OBJECTS := $($(wildcard $(VENDOR)/*.c):.c=.o)
 
+VENDOR_C = $(wildcard $(VENDOR)/*.c)
+VENDOR_OBJECTS = $(patsubst %.c,%.o,$(VENDOR_C))
 
 %.hex: %.elf
 	$(SIZE) $<
 	$(OBJCOPY) -O ihex -R .eeprom $< $@
 
 
-grbl.elf: $(OBJECTS) $(VENDOR_OBJECTS) $(VENDOR)/mk20dx128.ld
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(VENDOR_OBJECT) $< $(LIBS) 
+grbl.elf: $(OBJECTS) $(VENDOR_OBJECTS) 
+	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(VENDOR_OBJECTS) $(LIBS) 
 
 -include $(OBJS:.o=.d)
 

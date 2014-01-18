@@ -36,10 +36,18 @@
 
 #define MICROSECONDS_PER_ACCELERATION_TICK  (1000000/ACCELERATION_TICKS_PER_SECOND)
 
+#define RESET_CTRL PORTB_PCR16
+#define RESET_BIT  (1<<16)
+#define FEED_HOLD_CTRL PORTB_PCR17
+#define FEED_HOLD_BIT (1<<17)
+#define CYCLE_CTRL PORTB_PCR19
+#define CYCLE_BIT (1<<19)
+
+
 void limits_init() 
 {
   uint32_t config_reg;
-  LIMIT_DDR &= ~(LIMITS_MASK); // Set as input pins
+  LIMIT_DDR &= ~(LIMITS_MASK | RESET_BIT | FEED_HOLD_BIT | CYCLE_BIT); // Set as input pins
 
   #ifndef LIMIT_SWITCHES_ACTIVE_HIGH
   config_reg = PULL_UP | MUX_GPIO;
@@ -50,6 +58,11 @@ void limits_init()
   LIMIT_X_CTRL = config_reg;
   LIMIT_Y_CTRL = config_reg;
   LIMIT_Z_CTRL = config_reg;
+
+  config_reg = PULL_UP | MUX_GPIO | IRQC_FALLING;
+  RESET_CTRL = config_reg;
+  FEED_HOLD_CTRL = config_reg;
+  CYCLE_CTRL = config_reg;
 
   toggle_hard_limits(true);
 }
@@ -99,6 +112,21 @@ void portb_isr(void){
 	mc_reset(); // Initiate system kill.
 	sys.execute |= EXEC_CRIT_EVENT; // Indicate hard limit critical event
       }
+    }
+  }
+
+  if(PORTB_ISFR & INPUT_MASK){
+    if(RESET_CTRL & ISF){
+      RESET_CTRL |= ISF;
+      mc_reset();
+    }
+    if(FEED_HOLD_CTRL & ISF){
+      FEED_HOLD_CTRL |= ISF;
+      sys.execute |= EXEC_FEED_HOLD;
+    }
+    if(CYCLE_CTRL & ISF){
+      CYCLE_CTRL |= ISF;
+      sys.execute |= EXEC_CYCLE_START;
     }
   }
 }

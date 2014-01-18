@@ -45,7 +45,6 @@ system_t sys;
 int main(void)
 {
   // Initialize system
-  serial_init(); // Setup serial baud rate and interrupts
   settings_init(); // Load grbl settings from EEPROM
   st_init(); // Setup stepper pins and interrupt timers
   
@@ -60,7 +59,6 @@ int main(void)
     // reset to finish the initialization process.
     if (sys.abort) {
       // Reset system.
-      serial_reset_read_buffer(); // Clear serial read buffer
       plan_init(); // Clear block buffer and planner variables
       gc_init(); // Set g-code parser to default state
       protocol_init(); // Clear incoming line data and execute startup lines

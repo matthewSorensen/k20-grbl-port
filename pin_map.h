@@ -83,7 +83,16 @@
 #define LIMIT_Y_BIT  2
 #define LIMIT_Z_CTRL PORTB_PCR3
 #define LIMIT_Z_BIT  (1<<3)
-
 #define LIMITS_MASK (3 | (1<<3))
+
+#define RESET_CTRL PORTB_PCR16
+#define RESET_BIT  (1<<16)
+#define FEED_HOLD_CTRL PORTB_PCR17
+#define FEED_HOLD_BIT (1<<17)
+#define CYCLE_CTRL PORTB_PCR19
+#define CYCLE_BIT (1<<19)
+
+#define INPUT_MASK (RESET_BIT | FEED_HOLD_BIT | CYCLE_BIT)
+
 
 #endif

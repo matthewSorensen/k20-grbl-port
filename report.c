@@ -33,6 +33,11 @@
 #include "gcode.h"
 #include "coolant_control.h"
 
+#include <util.h>
+#include <usb_serial.h>
+
+extern int usb_serial_write(const void *buffer, uint32_t size);
+extern void usb_serial_flush_output(void);
 
 #define PSTR(x) x
 #define printPgmString(x) usb_serial_write(x,sizeof(x) - 1)
@@ -95,7 +100,8 @@ void report_alarm_message(int8_t alarm_code)
     printPgmString(PSTR("Abort during cycle")); break;
   }
   printPgmString(PSTR(". MPos?\r\n"));
-  delay_ms(500); // Force delay to ensure message clears serial write buffer.
+  delay(500); // Force delay to ensure message clears serial write buffer.
+  usb_serial_flush_output();
 }
 
 // Prints feedback messages. This serves as a centralized method to provide additional

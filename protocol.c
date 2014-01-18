@@ -19,8 +19,6 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <avr/io.h>
-#include <avr/interrupt.h>
 #include "protocol.h"
 #include "gcode.h"
 #include "serial.h"
@@ -43,16 +41,12 @@ static void protocol_reset_line_buffer()
   iscomment = false;
 }
 
-
 void protocol_init() 
 {
   protocol_reset_line_buffer();
   report_init_message(); // Welcome message   
-  
-  PINOUT_DDR &= ~(PINOUT_MASK); // Set as input pins
-  PINOUT_PORT |= PINOUT_MASK; // Enable internal pull-up resistors. Normal high operation.
-  PINOUT_PCMSK |= PINOUT_MASK;   // Enable specific pins of the Pin Change Interrupt
-  PCICR |= (1 << PINOUT_INT);   // Enable Pin Change Interrupt
+  // All IO is moved to limit.c, as the pins for reset, hold, and start are
+  // all on port b and require the interrupt.
 }
 
 // Executes user startup script, if stored.
@@ -69,24 +63,6 @@ void protocol_execute_startup()
       }
     } 
   }  
-}
-
-// Pin change interrupt for pin-out commands, i.e. cycle start, feed hold, and reset. Sets
-// only the runtime command execute variable to have the main program execute these when 
-// its ready. This works exactly like the character-based runtime commands when picked off
-// directly from the incoming serial data stream.
-ISR(PINOUT_INT_vect) 
-{
-  // Enter only if any pinout pin is actively low.
-  if ((PINOUT_PIN & PINOUT_MASK) ^ PINOUT_MASK) { 
-    if (bit_isfalse(PINOUT_PIN,bit(PIN_RESET))) {
-      mc_reset();
-    } else if (bit_isfalse(PINOUT_PIN,bit(PIN_FEED_HOLD))) {
-      sys.execute |= EXEC_FEED_HOLD; 
-    } else if (bit_isfalse(PINOUT_PIN,bit(PIN_CYCLE_START))) {
-      sys.execute |= EXEC_CYCLE_START;
-    }
-  }
 }
 
 // Executes run-time commands, when required. This is called from various check points in the main
@@ -293,7 +269,24 @@ uint8_t protocol_execute_line(char *line)
 void protocol_process()
 {
   uint8_t c;
-  while((c = serial_read()) != SERIAL_NO_DATA) {
+  uint32_t raw;
+
+  while((raw = usb_serial_getchar()) && raw != -1){
+    c = raw;
+
+    if(c == CMD_STATUS_REPORT){
+      sys.execute |= EXEC_STATUS_REPORT;
+      continue;
+    }
+    if(c == CMD_FEED_HOLD){
+      sys.execute |= EXEC_FEED_HOLD;
+      continue;
+    }
+    if(c == CMD_RESET){
+      mc_reset();
+      continue;
+    }
+
     if ((c == '\n') || (c == '\r')) { // End of line reached
 
       // Runtime command check point before executing line. Prevent any furthur line executions.

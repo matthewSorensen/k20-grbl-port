@@ -21,7 +21,7 @@
 #ifndef protocol_h
 #define protocol_h
 
-#include <avr/sleep.h>
+#include <stdint.h>
 
 // Line buffer size from the serial input stream to be executed.
 // NOTE: Not a problem except for extreme cases, but the line buffer size can be too small
@@ -30,7 +30,7 @@
 // memory space we can invest into here or we re-write the g-code parser not to have his 
 // buffer.
 #ifndef LINE_BUFFER_SIZE
-  #define LINE_BUFFER_SIZE 70
+  #define LINE_BUFFER_SIZE 16
 #endif
 
 // Initialize the serial protocol
