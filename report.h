@@ -19,7 +19,7 @@
 */
 #ifndef report_h
 #define report_h
-
+#include <stdint.h>
 
 // Define Grbl status codes.
 #define STATUS_OK 0

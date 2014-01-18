@@ -19,71 +19,41 @@
   along with Grbl.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* This code was initially inspired by the wiring_serial module by David A. Mellis which
-   used to be a part of the Arduino project. */ 
-
-
-#include <avr/pgmspace.h>
 #include "config.h"
 #include "serial.h"
 #include "settings.h"
 
+int usb_serial_putchar(uint8_t c); 
+int usb_serial_write(const void *buffer, uint32_t size);
+
 void printString(const char *s)
 {
-  while (*s)
-    serial_write(*s++);
+  uint32_t len = 0;
+  const char* p = s;
+  while(*(p++)) len++;
+  
+  usb_serial_write(s, len);
 }
-
-// Print a string stored in PGM-memory
-void printPgmString(const char *s)
-{
-  char c;
-  while ((c = pgm_read_byte_near(s++)))
-    serial_write(c);
-}
-
-// void printIntegerInBase(unsigned long n, unsigned long base)
-// { 
-// 	unsigned char buf[8 * sizeof(long)]; // Assumes 8-bit chars. 
-// 	unsigned long i = 0;
-// 
-// 	if (n == 0) {
-// 		serial_write('0');
-// 		return;
-// 	} 
-// 
-// 	while (n > 0) {
-// 		buf[i++] = n % base;
-// 		n /= base;
-// 	}
-// 
-// 	for (; i > 0; i--)
-// 		serial_write(buf[i - 1] < 10 ?
-// 			'0' + buf[i - 1] :
-// 			'A' + buf[i - 1] - 10);
-// }
 
 void print_uint8_base2(uint8_t n)
 { 
 	unsigned char buf[8];
 	uint8_t i = 0;
-
+	
 	for (; i < 8; i++) {
-		buf[i] = n & 1;
-		n >>= 1;
+	  buf[i] = (n & 1) + '0';
+	  n >>= 1;
 	}
-
-	for (; i > 0; i--)
-		serial_write('0' + buf[i - 1]);
+	usb_serial_write(buf, 8);
 }
 
-static void print_uint32_base10(unsigned long n)
+static void print_uint32_base10(uint32_t n)
 { 
   unsigned char buf[10]; 
   uint8_t i = 0;
   
   if (n == 0) {
-    serial_write('0');
+    usb_serial_putchar('0');
     return;
   } 
   
@@ -93,13 +63,13 @@ static void print_uint32_base10(unsigned long n)
   }
     
   for (; i > 0; i--)
-    serial_write(buf[i-1]);
+    usb_serial_putchar(buf[i-1]);
 }
 
 void printInteger(long n)
 {
   if (n < 0) {
-    serial_write('-');
+    usb_serial_putchar('-');
     n = -n;
   }
   print_uint32_base10(n);
@@ -113,7 +83,7 @@ void printInteger(long n)
 void printFloat(float n)
 {
   if (n < 0) {
-    serial_write('-');
+    usb_serial_putchar('-');
     n = -n;
   }
 
@@ -145,5 +115,5 @@ void printFloat(float n)
   
   // Print the generated string.
   for (; i > 0; i--)
-    serial_write(buf[i-1]);
+    usb_serial_putchar(buf[i-1]);
 }
