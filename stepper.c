@@ -351,6 +351,10 @@ void st_init()
   // Configure PIT 1 - reset timer
   PIT_TCTRL1 = TIE;
   // Start in the idle state, but first wake up to check for keep steppers enabled option.
+
+  NVIC_ENABLE_IRQ(IRQ_PIT_CH0);
+  NVIC_ENABLE_IRQ(IRQ_PIT_CH1);
+
   st_wake_up();
   st_go_idle();
 }
