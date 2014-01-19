@@ -47,8 +47,7 @@ static volatile uint32_t out_bits;
 int main(void){
   st_init();
   limits_init();
-  while(1) homing_cycle(ALL,ALL,0,600);
-
+  while(1) homing_cycle(ALL,ALL,1,0.06);
 }
 void limits_init() 
 {
@@ -111,11 +110,6 @@ void pit1_isr(void){
 
 static void homing_cycle(uint32_t cycle_mask, int32_t pos_dir, bool invert_pin, float homing_rate) 
 {
-  #ifdef LIMIT_SWITCHES_ACTIVE_HIGH
-    // When in an active-high switch configuration, invert_pin needs to be adjusted.
-    invert_pin = !invert_pin;
-  #endif
-
   // Determine governing axes with finest step resolution per distance for the Bresenham
   // algorithm. This solves the issue when homing multiple axes that have different 
   // resolutions without exceeding system acceleration setting. It doesn't have to be
@@ -178,22 +172,22 @@ static void homing_cycle(uint32_t cycle_mask, int32_t pos_dir, bool invert_pin, 
   uint32_t out_bits;
   uint32_t limit_state;
   for(;;) {
-  
+    
     // Reset out bits. Both direction and step pins appropriately inverted and set.
     out_bits = out_bits0;
     
     // Get limit pin state.
     limit_state = LIMIT_PORT(DIR);
-    if (invert_pin) { limit_state ^= LIMITS_MASK; } // If leaving switch, invert to move.
+    if (invert_pin) {limit_state = ~ limit_state;} // If leaving switch, invert to move.
     
     // Set step pins by Bresenham line algorithm. If limit switch reached, disable and
     // flag for completion.
     if (cycle_mask & (1<<X_AXIS)) {
       counter_x += steps[X_AXIS];
       if (counter_x > 0) {
-        if (limit_state & LIMIT_X_BIT) { out_bits ^= STEP_X_BIT; }
+	// High means that we're still ticking, so toggle the step bit from the disable state
+	if (limit_state & LIMIT_X_BIT) { out_bits ^= STEP_X_BIT; }
         else { cycle_mask &= ~(1<<X_AXIS); }
-        counter_x -= step_event_count;
       }
     }
     if (cycle_mask & (1<<Y_AXIS)) {
@@ -214,34 +208,25 @@ static void homing_cycle(uint32_t cycle_mask, int32_t pos_dir, bool invert_pin, 
     }        
     
     // Perform step.
-    // Set the direction pins a couple of nanoseconds before we step the steppers
-    //    STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
-    //delay_micoseconds(step_delay);
-    //STEPPER_PORT(SOR) = out_bits;
-    //delay_microseconds(500); //settings.pulse_microseconds);
-    //STEPPER_PORT(COR) = STEP_MASK;
-
-    while(1){
-      STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
-      STEPPER_PORT(COR) = INVERT_MASK & out_bits;
-      delay_microseconds(480);
-      STEPPER_PORT(TOR) = out_bits & STEP_MASK;
-      delay_microseconds(10000);
+    STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
+    STEPPER_PORT(COR) = INVERT_MASK & out_bits;
+    delay_microseconds(480); // Pulse length
+    STEPPER_PORT(TOR) = out_bits & STEP_MASK;
+    delay_microseconds(step_delay); // Pules rate
+    
+    
+    // Track and set the next step delay, if required. This routine uses another Bresenham
+    // line algorithm to follow the constant acceleration line in the velocity and time 
+    // domain. This is a lite version of the same routine used in the main stepper program.
+    if (dt > dt_min) { // Unless cruising, check for time update.
+      trap_counter += dt; // Track time passed since last update.
+      if (trap_counter > MICROSECONDS_PER_ACCELERATION_TICK) {
+	trap_counter -= MICROSECONDS_PER_ACCELERATION_TICK;
+	step_rate += delta_rate; // Increment velocity
+	dt = (1000000*60)/step_rate; // Compute new time increment
+	if (dt < dt_min) {dt = dt_min;}  // If target rate reached, cruise.
+	step_delay = dt-480;
+      }
     }
-  
-  
-  // Track and set the next step delay, if required. This routine uses another Bresenham
-  // line algorithm to follow the constant acceleration line in the velocity and time 
-  // domain. This is a lite version of the same routine used in the main stepper program.
-  if (dt > dt_min) { // Unless cruising, check for time update.
-    trap_counter += dt; // Track time passed since last update.
-    if (trap_counter > MICROSECONDS_PER_ACCELERATION_TICK) {
-      trap_counter -= MICROSECONDS_PER_ACCELERATION_TICK;
-      step_rate += delta_rate; // Increment velocity
-      dt = (1000000*60)/step_rate; // Compute new time increment
-      if (dt < dt_min) {dt = dt_min;}  // If target rate reached, cruise.
-      step_delay = dt-480;
-    }
-  }
   }
 }
