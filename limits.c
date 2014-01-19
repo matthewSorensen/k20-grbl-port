@@ -52,7 +52,7 @@ void limits_init()
   LIMIT_Y_CTRL = config_reg;
   LIMIT_Z_CTRL = config_reg;
 
-  config_reg = PULL_UP | MUX_GPIO;
+  config_reg = PULL_UP | MUX_GPIO | IRQC_FALLING;
   RESET_CTRL = config_reg;
   FEED_HOLD_CTRL = config_reg;
   CYCLE_CTRL = config_reg;
