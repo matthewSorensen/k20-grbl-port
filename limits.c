@@ -36,13 +36,6 @@
 
 #define MICROSECONDS_PER_ACCELERATION_TICK  (1000000/ACCELERATION_TICKS_PER_SECOND)
 
-#define RESET_CTRL PORTB_PCR16
-#define RESET_BIT  (1<<16)
-#define FEED_HOLD_CTRL PORTB_PCR17
-#define FEED_HOLD_BIT (1<<17)
-#define CYCLE_CTRL PORTB_PCR19
-#define CYCLE_BIT (1<<19)
-
 
 void limits_init() 
 {
@@ -59,7 +52,7 @@ void limits_init()
   LIMIT_Y_CTRL = config_reg;
   LIMIT_Z_CTRL = config_reg;
 
-  config_reg = PULL_UP | MUX_GPIO | IRQC_FALLING;
+  config_reg = PULL_UP | MUX_GPIO;
   RESET_CTRL = config_reg;
   FEED_HOLD_CTRL = config_reg;
   CYCLE_CTRL = config_reg;
@@ -250,11 +243,11 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
     // Perform step.
     // Set the direction pins a couple of nanoseconds before we step the steppers
     STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
-    delay_microseconds(settings.pulse_microseconds);
-    STEPPER_PORT(COR) = STEP_MASK;
+    delay(step_delay);
     STEPPER_PORT(SOR) = out_bits;
-    delay_microseconds(step_delay);
-
+    delay(500); //settings.pulse_microseconds);
+    STEPPER_PORT(COR) = STEP_MASK;
+   
     // Track and set the next step delay, if required. This routine uses another Bresenham
     // line algorithm to follow the constant acceleration line in the velocity and time 
     // domain. This is a lite version of the same routine used in the main stepper program.
