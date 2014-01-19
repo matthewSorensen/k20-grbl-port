@@ -133,7 +133,7 @@ void portb_isr(void){
 // algorithm is written here. This also lets users hack and tune this code freely for
 // their own particular needs without affecting the rest of Grbl.
 // NOTE: Only the abort runtime command can interrupt this process.
-static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, float homing_rate) 
+static void homing_cycle(uint32_t cycle_mask, int32_t pos_dir, bool invert_pin, float homing_rate) 
 {
   #ifdef LIMIT_SWITCHES_ACTIVE_HIGH
     // When in an active-high switch configuration, invert_pin needs to be adjusted.
@@ -240,14 +240,15 @@ static void homing_cycle(uint8_t cycle_mask, int8_t pos_dir, bool invert_pin, fl
     // Check if we are done or for system abort
     if (!(cycle_mask) || (sys.execute & EXEC_RESET)) { return; }
         
+#define INVERT_MASK 0
     // Perform step.
-    // Set the direction pins a couple of nanoseconds before we step the steppers
-    STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
-    delay(step_delay);
-    STEPPER_PORT(SOR) = out_bits;
-    delay(500); //settings.pulse_microseconds);
-    STEPPER_PORT(COR) = STEP_MASK;
-   
+    STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
+    STEPPER_PORT(COR) = INVERT_MASK & out_bits;
+    delay_microseconds(settings.pulse_microseconds); // Pulse length
+    STEPPER_PORT(TOR) = out_bits & STEP_MASK;
+    delay_microseconds(step_delay); // Pules rate
+
+
     // Track and set the next step delay, if required. This routine uses another Bresenham
     // line algorithm to follow the constant acceleration line in the velocity and time 
     // domain. This is a lite version of the same routine used in the main stepper program.
