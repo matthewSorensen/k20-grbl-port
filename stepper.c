@@ -61,8 +61,9 @@ static block_t *current_block;  // A pointer to the block currently being traced
 
 // Used by the stepper driver interrupt
 static uint32_t step_pulse_time; // Step pulse reset time after step rise
-static uint32_t out_bits;
-static volatile uint32_t busy;   // True when SIG_OUTPUT_COMPARE1A is being serviced. Used to avoid retriggering that handler.
+volatile uint32_t out_bits;
+volatile uint32_t reset_bits;
+volatile uint32_t busy;   // True when SIG_OUTPUT_COMPARE1A is being serviced. Used to avoid retriggering that handler.
 
 //         __________________________
 //        /|                        |\     _________________         ^
@@ -142,26 +143,24 @@ inline static uint32_t iterate_trapezoid_cycle_counter()
 void pit0_isr(void) {
   PIT_TFLG0 = 1;
 
-  __disable_irq(); // For symmetry - does the AVR disable this by default.
+  //__disable_irq(); // For symmetry - does the AVR disable this by default.
 
   if (busy) { return; } // The busy-flag is used to avoid reentering this interrupt
   
-  // Set the direction pins a couple of nanoseconds before we step the steppers
-  STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
-  // Then pulse the stepping pins
-  STEPPER_PORT(COR) = STEP_MASK;
-  STEPPER_PORT(SOR) = out_bits;
-    
+  #define INVERT_MASK 0
+  STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
+  STEPPER_PORT(COR) = INVERT_MASK & out_bits;
   // Enable step pulse reset timer so that The Stepper Port Reset Interrupt can reset the signal after
   // exactly settings.pulse_microseconds microseconds, independent of the main Timer1 prescaler.
-  PIT_LDVAL1 = step_pulse_time;
+  reset_bits = out_bits & STEP_MASK;
+  PIT_LDVAL1 = 480;
   PIT_TCTRL1 |= TEN;  
 
   busy = true;
   // Re-enable interrupts to allow ISR_TIMER2_OVERFLOW to trigger on-time and allow serial communications
   // regardless of time in this handler. The following code prepares the stepper driver for the next
   // step interrupt compare and will always finish before returning to the main program.
-  __enable_irq();
+  //__enable_irq();
   
   // If there is no current block, attempt to pop one from the buffer
   if (current_block == NULL) {
@@ -317,8 +316,9 @@ void pit0_isr(void) {
 
 void pit1_isr(void){
   PIT_TFLG1 = 1;
-  STEPPER_PORT(DOR)= (STEPPER_PORT(DOR) & ~STEP_MASK) | (settings.invert_mask & STEP_MASK); 
-  PIT_TCTRL1 &= ~TEN; // Disable this timer
+  PIT_TCTRL1 &= ~TEN;
+
+  STEPPER_PORT(TOR) = reset_bits;
 }
 
 // Reset and clear stepper subsystem variables
@@ -365,7 +365,7 @@ void st_init()
 static uint32_t config_step_timer(uint32_t cycles)
 {
 
-  PIT_TCTRL0 &= TEN; // Stop the timer 
+  PIT_TCTRL0 &= ~TEN; // Stop the timer 
   PIT_LDVAL0 = cycles; // Load the new value
   PIT_TCTRL0 |= TEN;
   return(cycles);
