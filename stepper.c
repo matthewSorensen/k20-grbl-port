@@ -88,6 +88,9 @@ static void set_step_events_per_minute(uint32_t steps_per_minute);
 // enabled. Startup init and limits call this function but shouldn't start the cycle.
 void st_wake_up() 
 {
+  // Before we enable the stepper motors, make sure that the step bits are set to not trigger a pulse
+  STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~STEP_MASK) | (STEP_MASK & settings.invert_mask);
+
   // Enable steppers by resetting the stepper disable port
   if (bit_istrue(settings.flags,BITFLAG_INVERT_ST_ENABLE)) { 
     STEPPER_DISABLE_PORT(SOR) = STEPPER_DISABLE_BIT; 
@@ -153,8 +156,7 @@ void pit0_isr(void) {
   
   delay_microseconds(1);
 
-  STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
-  STEPPER_PORT(COR) = INVERT_MASK & (~out_bits);
+  STEPPER_PORT(TOR) = out_bits & STEP_MASK;
   // Enable step pulse reset timer so that The Stepper Port Reset Interrupt can reset the signal after
   // exactly settings.pulse_microseconds microseconds, independent of the main Timer1 prescaler.
   reset_bits = out_bits & STEP_MASK;
@@ -308,7 +310,7 @@ void pit0_isr(void) {
       plan_discard_current_block();
     }
   }
-  out_bits ^= settings.invert_mask;  // Apply step and direction invert mask    
+  out_bits ^= settings.invert_mask & DIRECTION_MASK;  // Apply direction invert mask
   busy = false;
 }
 
