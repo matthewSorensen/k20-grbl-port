@@ -148,8 +148,13 @@ void pit0_isr(void) {
   if (busy) { return; } // The busy-flag is used to avoid reentering this interrupt
   
   #define INVERT_MASK 0
+  STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits & DIRECTION_MASK;
+  STEPPER_PORT(COR) = INVERT_MASK & (~out_bits) & DIRECTION_MASK;
+  
+  delay_microseconds(1);
+
   STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
-  STEPPER_PORT(COR) = INVERT_MASK & out_bits;
+  STEPPER_PORT(COR) = INVERT_MASK & (~out_bits);
   // Enable step pulse reset timer so that The Stepper Port Reset Interrupt can reset the signal after
   // exactly settings.pulse_microseconds microseconds, independent of the main Timer1 prescaler.
   reset_bits = out_bits & STEP_MASK;

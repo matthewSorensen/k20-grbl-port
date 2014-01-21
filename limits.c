@@ -241,9 +241,13 @@ static void homing_cycle(uint32_t cycle_mask, int32_t pos_dir, bool invert_pin, 
     if (!(cycle_mask) || (sys.execute & EXEC_RESET)) { return; }
         
 #define INVERT_MASK 0
+    STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
+    STEPPER_PORT(COR) = INVERT_MASK & ~out_bits;
+    delay_microseconds(1);
+
     // Perform step.
     STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
-    STEPPER_PORT(COR) = INVERT_MASK & out_bits;
+    STEPPER_PORT(COR) = INVERT_MASK & ~out_bits;
     delay_microseconds(settings.pulse_microseconds); // Pulse length
     STEPPER_PORT(TOR) = out_bits & STEP_MASK;
     delay_microseconds(step_delay); // Pules rate
