@@ -63,6 +63,11 @@ static block_t *current_block;  // A pointer to the block currently being traced
 static uint32_t step_pulse_time; // Step pulse reset time after step rise
 volatile uint32_t out_bits;
 volatile uint32_t reset_bits;
+
+#define STEP_INT_SET 0
+#define STEP_INT_RESET 1
+volatile uint32_t step_interrupt_status;
+
 volatile uint32_t busy;   // True when SIG_OUTPUT_COMPARE1A is being serviced. Used to avoid retriggering that handler.
 
 //         __________________________
@@ -154,13 +159,11 @@ void pit0_isr(void) {
   STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits & DIRECTION_MASK;
   STEPPER_PORT(COR) = INVERT_MASK & (~out_bits) & DIRECTION_MASK;
   
-  delay_microseconds(1);
-
-  STEPPER_PORT(TOR) = out_bits & STEP_MASK;
   // Enable step pulse reset timer so that The Stepper Port Reset Interrupt can reset the signal after
   // exactly settings.pulse_microseconds microseconds, independent of the main Timer1 prescaler.
   reset_bits = out_bits & STEP_MASK;
-  PIT_LDVAL1 = 480;
+  step_interrupt_status = STEP_INT_SET;
+  PIT_LDVAL1 = 30;
   PIT_TCTRL1 |= TEN;  
 
   busy = true;
@@ -324,8 +327,12 @@ void pit0_isr(void) {
 void pit1_isr(void){
   PIT_TFLG1 = 1;
   PIT_TCTRL1 &= ~TEN;
-
   STEPPER_PORT(TOR) = reset_bits;
+  if(step_interrupt_status == STEP_INT_SET){
+    step_interrupt_status = STEP_INT_RESET;
+    PIT_LDVAL1 = 480;
+    PIT_TCTRL1 |= TEN;  
+  }
 }
 
 // Reset and clear stepper subsystem variables
