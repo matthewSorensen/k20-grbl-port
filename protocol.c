@@ -21,7 +21,6 @@
 
 #include "protocol.h"
 #include "gcode.h"
-#include "serial.h"
 #include "print.h"
 #include "settings.h"
 #include "config.h"

@@ -20,7 +20,6 @@
 */
 
 #include "config.h"
-#include "serial.h"
 #include "settings.h"
 
 int usb_serial_putchar(uint8_t c); 
@@ -47,7 +46,7 @@ void print_uint8_base2(uint8_t n)
 	usb_serial_write(buf, 8);
 }
 
-static void print_uint32_base10(uint32_t n)
+void print_uint32_base10(uint32_t n)
 { 
   unsigned char buf[10]; 
   uint8_t i = 0;

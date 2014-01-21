@@ -37,7 +37,7 @@
 #include "limits.h"
 #include "report.h"
 #include "settings.h"
-#include "serial.h"
+#include <flexram.h>
 
 // Declare system global variable structure
 system_t sys; 
@@ -45,6 +45,7 @@ system_t sys;
 int main(void)
 {
   // Initialize system
+  initialize_flexram();
   settings_init(); // Load grbl settings from EEPROM
   st_init(); // Setup stepper pins and interrupt timers
   

@@ -45,8 +45,8 @@
 // developments.
 
 // All of these are in 32-bit words, not bytes
-#define EEPROM_ADDR_GLOBAL 0
-#define EEPROM_ADDR_PARAMETERS 128
+#define EEPROM_ADDR_GLOBAL 128
+#define EEPROM_ADDR_PARAMETERS 0
 #define EEPROM_ADDR_STARTUP_BLOCK 192
 
 // Define EEPROM address indexing for coordinate parameters
@@ -60,13 +60,11 @@
 // Global persistent settings (Stored from byte EEPROM_ADDR_GLOBAL onwards)
 typedef struct {
   uint32_t version;
-
+  uint32_t invert_mask;
   float steps_per_mm[3];
-  uint8_t microsteps;
-  uint8_t pulse_microseconds;
   float default_feed_rate;
   float default_seek_rate;
-  uint32_t invert_mask;
+
   float mm_per_arc_segment;
   float acceleration;
   float junction_deviation;
@@ -76,6 +74,8 @@ typedef struct {
   float homing_seek_rate;
   uint16_t homing_debounce_delay;
   float homing_pulloff;
+  uint8_t microsteps;
+  uint8_t pulse_microseconds;
   uint8_t stepper_idle_lock_time; // If max value 255, steppers do not disable.
   uint8_t decimal_places;
   uint8_t n_arc_correction;
