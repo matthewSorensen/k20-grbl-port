@@ -56,7 +56,7 @@ typedef struct {
   uint32_t min_safe_rate;  // Minimum safe rate for full deceleration rate reduction step. Otherwise halves step_rate.
 } stepper_t;
 
-static stepper_t st;
+volatile stepper_t st;
 static block_t *current_block;  // A pointer to the block currently being traced
 
 // Used by the stepper driver interrupt
@@ -151,14 +151,10 @@ inline static uint32_t iterate_trapezoid_cycle_counter()
 void pit0_isr(void) {
   PIT_TFLG0 = 1;
 
-  //__disable_irq(); // For symmetry - does the AVR disable this by default.
-
   if (busy) { return; } // The busy-flag is used to avoid reentering this interrupt
   
-  #define INVERT_MASK 0
-  STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits & DIRECTION_MASK;
-  STEPPER_PORT(COR) = INVERT_MASK & (~out_bits) & DIRECTION_MASK;
-  
+  STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
+
   // Enable step pulse reset timer so that The Stepper Port Reset Interrupt can reset the signal after
   // exactly settings.pulse_microseconds microseconds, independent of the main Timer1 prescaler.
   reset_bits = out_bits & STEP_MASK;
@@ -170,7 +166,6 @@ void pit0_isr(void) {
   // Re-enable interrupts to allow ISR_TIMER2_OVERFLOW to trigger on-time and allow serial communications
   // regardless of time in this handler. The following code prepares the stepper driver for the next
   // step interrupt compare and will always finish before returning to the main program.
-  //__enable_irq();
   
   // If there is no current block, attempt to pop one from the buffer
   if (current_block == NULL) {
