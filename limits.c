@@ -196,7 +196,7 @@ static void homing_cycle(uint32_t cycle_mask, int32_t pos_dir, bool invert_pin, 
   int32_t counter_x = -(step_event_count >> 1); // Bresenham counters
   int32_t counter_y = counter_x;
   int32_t counter_z = counter_x;
-  uint32_t step_delay = dt-settings.pulse_microseconds;  // Step delay after pulse
+  uint32_t step_delay = dt;  // Step delay after pulse
   uint32_t step_rate = 0;  // Tracks step rate. Initialized from 0 rate. (in step/min)
   uint32_t trap_counter = MICROSECONDS_PER_ACCELERATION_TICK/2; // Acceleration trapezoid counter
   uint32_t out_bits;
@@ -239,19 +239,10 @@ static void homing_cycle(uint32_t cycle_mask, int32_t pos_dir, bool invert_pin, 
     
     // Check if we are done or for system abort
     if (!(cycle_mask) || (sys.execute & EXEC_RESET)) { return; }
-        
-#define INVERT_MASK 0
-    STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
-    STEPPER_PORT(COR) = INVERT_MASK & ~out_bits;
-    delay_microseconds(1);
-
-    // Perform step.
-    STEPPER_PORT(SOR) = (~INVERT_MASK) & out_bits;
-    STEPPER_PORT(COR) = INVERT_MASK & ~out_bits;
-    delay_microseconds(settings.pulse_microseconds); // Pulse length
-    STEPPER_PORT(TOR) = out_bits & STEP_MASK;
+      
+    STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
+    trigger_pulse(out_bits & STEP_MASK);
     delay_microseconds(step_delay); // Pules rate
-
 
     // Track and set the next step delay, if required. This routine uses another Bresenham
     // line algorithm to follow the constant acceleration line in the velocity and time 
@@ -263,7 +254,7 @@ static void homing_cycle(uint32_t cycle_mask, int32_t pos_dir, bool invert_pin, 
         step_rate += delta_rate; // Increment velocity
         dt = (1000000*60)/step_rate; // Compute new time increment
         if (dt < dt_min) {dt = dt_min;}  // If target rate reached, cruise.
-        step_delay = dt-settings.pulse_microseconds;
+        step_delay = dt;
       }
     }
   }

@@ -22,7 +22,7 @@
 #ifndef stepper_h
 #define stepper_h 
 
-
+#include <stdint.h>
 // Initialize and setup the stepper motor subsystem
 void st_init();
 
@@ -44,4 +44,5 @@ void st_cycle_reinitialize();
 // Initiates a feed hold of the running program
 void st_feed_hold();
 
+void trigger_pulse(uint32_t);
 #endif

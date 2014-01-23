@@ -35,10 +35,6 @@
 #define TICKS_PER_MICROSECOND (F_CPU/1000000)
 #define CYCLES_PER_ACCELERATION_TICK ((TICKS_PER_MICROSECOND*1000000)/ACCELERATION_TICKS_PER_SECOND)
 
-// Bits in the PIT register:
-#define TIE 2 // Timer interrupt enable
-#define TEN 1 // Timer enable
-
 // Stepper state variable. Contains running data and trapezoid variables.
 typedef struct {
   // Used by the bresenham line algorithm
@@ -56,17 +52,24 @@ typedef struct {
   uint32_t min_safe_rate;  // Minimum safe rate for full deceleration rate reduction step. Otherwise halves step_rate.
 } stepper_t;
 
-volatile stepper_t st;
+static stepper_t st;
 static block_t *current_block;  // A pointer to the block currently being traced
 
-// Used by the stepper driver interrupt
-static uint32_t step_pulse_time; // Step pulse reset time after step rise
-volatile uint32_t out_bits;
-volatile uint32_t reset_bits;
+// Bits in the PIT register:
+#define TIE 2 // Timer interrupt enable
+#define TEN 1 // Timer enable
+enum pulse_status {PULSE_SET, PULSE_RESET};
 
-#define STEP_INT_SET 0
-#define STEP_INT_RESET 1
-volatile uint32_t step_interrupt_status;
+typedef struct {
+  volatile uint32_t active_bits;
+  uint32_t pulse_length;
+  volatile enum pulse_status step_interrupt_status;
+} pulse_state;
+
+static pulse_state pit1_state;
+
+// Used by the stepper driver interrupt
+volatile uint32_t out_bits;
 
 volatile uint32_t busy;   // True when SIG_OUTPUT_COMPARE1A is being serviced. Used to avoid retriggering that handler.
 
@@ -106,7 +109,7 @@ void st_wake_up()
     // Initialize stepper output bits
     out_bits = (0) ^ (settings.invert_mask); 
     // Initialize step pulse timing from settings. Here to ensure updating after re-writing.
-    step_pulse_time = -(((settings.pulse_microseconds-2)*TICKS_PER_MICROSECOND) >> 3);
+    pit1_state.pulse_length = settings.pulse_microseconds*TICKS_PER_MICROSECOND;
     // Enable stepper driver interrupt
     PIT_TCTRL0 |= TIE;
   }
@@ -144,6 +147,8 @@ inline static uint32_t iterate_trapezoid_cycle_counter()
   }
 }          
 
+
+					  
 // "The Stepper Driver Interrupt" - This timer interrupt is the workhorse of Grbl. It is executed at the rate set with
 // config_step_timer. It pops blocks from the block_buffer and executes them by pulsing the stepper pins appropriately. 
 // It is supported by The Stepper Port Reset Interrupt which it uses to reset the stepper port after each pulse. 
@@ -152,20 +157,11 @@ void pit0_isr(void) {
   PIT_TFLG0 = 1;
 
   if (busy) { return; } // The busy-flag is used to avoid reentering this interrupt
-  
+  // Set the direction bits. Todo: only do this at the start of a block?
   STEPPER_PORT(DOR) = (STEPPER_PORT(DOR) & ~DIRECTION_MASK) | (out_bits & DIRECTION_MASK);
-
-  // Enable step pulse reset timer so that The Stepper Port Reset Interrupt can reset the signal after
-  // exactly settings.pulse_microseconds microseconds, independent of the main Timer1 prescaler.
-  reset_bits = out_bits & STEP_MASK;
-  step_interrupt_status = STEP_INT_SET;
-  PIT_LDVAL1 = 30;
-  PIT_TCTRL1 |= TEN;  
+  trigger_pulse(out_bits & STEP_MASK);
 
   busy = true;
-  // Re-enable interrupts to allow ISR_TIMER2_OVERFLOW to trigger on-time and allow serial communications
-  // regardless of time in this handler. The following code prepares the stepper driver for the next
-  // step interrupt compare and will always finish before returning to the main program.
   
   // If there is no current block, attempt to pop one from the buffer
   if (current_block == NULL) {
@@ -312,22 +308,33 @@ void pit0_isr(void) {
   busy = false;
 }
 
-// This interrupt is set up by PIT0 when it sets the motor port bits. It resets
-// the motor port after a short period (settings.pulse_microseconds) completing one step cycle.
-// NOTE: Interrupt collisions between the serial and stepper interrupts can cause delays by
-// a few microseconds, if they execute right before one another. Not a big deal, but can
-// cause issues at high step rates if another high frequency asynchronous interrupt is 
-// added to Grbl.
+inline void trigger_pulse(uint32_t active){
+  // Hand PIT1 the bit mask containing the step pins to toggle and enable it. In the case of stepper drivers
+  // that require a delay between setting direction pins and step pins (eg. DRV8825 - 650 ns), the PIT1 interrupt
+  // triggers once to set the pins active (per invert mask) and then resets itself and fires again to clear them.
+  // Otherwise, we toggle the bits here and pit1 fires once, clearing them.
+  pit1_state.active_bits = active;  
+#ifdef STEP_PULSE_DELAY
+  pit1_state.step_interrupt_status = PULSE_SET;
+  PIT_LDVAL1 = STEP_PULSE_DELAY;
+#else
+  STEPPER_PORT(TOR) = active;
+  PIT_LDVAL1 = pit1_state.pulse_length;
+#endif
+  PIT_TCTRL1 |= TEN;
+}
 
 void pit1_isr(void){
   PIT_TFLG1 = 1;
   PIT_TCTRL1 &= ~TEN;
-  STEPPER_PORT(TOR) = reset_bits;
-  if(step_interrupt_status == STEP_INT_SET){
-    step_interrupt_status = STEP_INT_RESET;
-    PIT_LDVAL1 = 480;
+  STEPPER_PORT(TOR) = pit1_state.active_bits;
+#ifdef STEP_PULSE_DELAY
+  if(pit1_state.step_interrupt_status == PULSE_SET){
+    pit1.step_interrupt_status = PULSE_RESET;
+    PIT_LDVAL1 = pit1_state.pulse_length;
     PIT_TCTRL1 |= TEN;  
   }
+  #endif
 }
 
 // Reset and clear stepper subsystem variables
