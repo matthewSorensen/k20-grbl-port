@@ -18,16 +18,14 @@
 
 # User configurable firmware setting:
 CLOCK = 48000000
+CPU =MK20DX256
+# For 3.1. For 3.0, MK20DX128
 
 TEENSY_PATH = /home/matthew/498/teensy-toolchain
 COMPILER = $(TEENSY_PATH)/hardware/tools/arm-none-eabi/bin
-VENDOR = /home/matthew/498/porting-grbl/vendor
 
-
-CPPFLAGS = -Wall -g -Os -mcpu=cortex-m4 -mthumb -nostdlib -MMD -DF_CPU=$(CLOCK) -DUSB_SERIAL -I$(VENDOR)
-CXXFLAGS = -std=gnu++0x -felide-constructors -fno-exceptions -fno-rtti
-CFLAGS =
-LDFLAGS = -Os -Wl,--gc-sections -mcpu=cortex-m4 -mthumb -T$(VENDOR)/mk20dx128.ld
+CFLAGS = -Wall -g -Os -mcpu=cortex-m4 -mthumb -nostdlib -MMD -DF_CPU=$(CLOCK) -DUSB_SERIAL -Ivendor/ -D__$(CPU)__
+LDFLAGS = -Os -Wl,--gc-sections -mcpu=cortex-m4 -mthumb -Tvendor/mk20dx256.ld
 LIBS = -lm
 CC = $(COMPILER)/arm-none-eabi-gcc
 CXX = $(COMPILER)/arm-none-eabi-g++
@@ -40,7 +38,7 @@ OBJECTS    = main.o motion_control.o gcode.o spindle_control.o coolant_control.o
              print.o report.o
 
 
-VENDOR_C = $(wildcard $(VENDOR)/*.c)
+VENDOR_C = $(wildcard vendor/*.c)
 VENDOR_OBJECTS = $(patsubst %.c,%.o,$(VENDOR_C))
 
 %.hex: %.elf
@@ -55,5 +53,5 @@ grbl.elf: $(OBJECTS) $(VENDOR_OBJECTS)
 
 
 clean:
-	rm -f *.o *.d *.elf *.hex
+	rm -f *.o *.d *.elf *.hex vendor/*.o
 
