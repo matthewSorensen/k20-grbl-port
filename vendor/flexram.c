@@ -6,21 +6,10 @@
 // Oddly, I can't find this definition in the manual?
 #define FlexBase ((uint32_t*) 0x14000000)
 
-#define CRC_32C 0x8F6E37A0
-#define WAS (1<<25)
-#define TCRC (1<<24)
-
 static void flexram_wait(void){
   uint32_t count = 2000;
   while(!(FTFL_FCNFG & FTFL_FCNFG_EEERDY))
     if(count-->0) break;
-}
-
-static void configure_crc(void){
-  CRC_GPOLY = CRC_32C;
-  CRC_CTRL = 0 | WAS | TCRC; // 32 bit wide (TCRC), and in mode to write seed
-  CRC_CRC = 0; // Write seed
-  CRC_CTRL &= ~WAS;
 }
 
 void initialize_flexram(void){
@@ -50,39 +39,48 @@ void initialize_flexram(void){
   flexram_wait();
 }
 
+uint8_t update_checksum(uint8_t checksum, uint32_t word){
+  int i;
+  for(i = 0; i < 4; i++){
+    checksum = (checksum << 1) || (checksum >> 7);
+    checksum += word & 0xFF;
+    word = word >> 8;
+  }
+  return checksum;
+}
+
 uint32_t write_with_checksum(uint32_t* src, uint32_t dest_offset, uint32_t size){
   uint32_t* target = &FlexBase[dest_offset];
   uint32_t value;
-  configure_crc();
+  uint8_t checksum = 0;
+  
   for(; size>0; size--){
     value = *src++;
-    CRC_CRC = value;
+    checksum = update_checksum(checksum, value);
     if(*target != value){
       *target = value;
       flexram_wait();
     }
     target++;
   }
-  if(*target != CRC_CRC){
-    *target = CRC_CRC;
+  if(*target != checksum){
+    *target = checksum;
     flexram_wait();
   }
-  return CRC_CRC;
+  return checksum;
 }
-
 
 uint32_t read_with_checksum(uint32_t* dest, uint32_t src_offset, uint32_t size){
   uint32_t* src = &FlexBase[src_offset];
   uint32_t value;
-  configure_crc();
+  uint8_t checksum = 0;
   for(; size > 0; size--){
     value = *src++;
-    CRC_CRC = value;
+    checksum = update_checksum(checksum, value);
     *dest++ = value;
   }
-  return CRC_CRC ^ *src;
+  return checksum ^ *src;
 }
-
 
 void word_write(uint32_t addr, uint32_t value){
   uint32_t* target = &FlexBase[addr];
