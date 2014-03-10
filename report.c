@@ -137,6 +137,7 @@ void report_init_message()
 
 // Grbl help message
 void report_grbl_help() {
+  report_init_message();
   printPgmString(PSTR("$$ (view Grbl settings)\r\n"
                       "$# (view # parameters)\r\n"
                       "$G (view parser state)\r\n"
