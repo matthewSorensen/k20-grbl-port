@@ -330,7 +330,7 @@ void pit1_isr(void){
   STEPPER_PORT(TOR) = pit1_state.active_bits;
 #ifdef STEP_PULSE_DELAY
   if(pit1_state.step_interrupt_status == PULSE_SET){
-    pit1.step_interrupt_status = PULSE_RESET;
+    pit1_state.step_interrupt_status = PULSE_RESET;
     PIT_LDVAL1 = pit1_state.pulse_length;
     PIT_TCTRL1 |= TEN;  
   }
