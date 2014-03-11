@@ -371,6 +371,8 @@ void st_init()
   NVIC_ENABLE_IRQ(IRQ_PIT_CH0);
   NVIC_ENABLE_IRQ(IRQ_PIT_CH1);
 
+  NVIC_SET_PRIORITY(IRQ_PIT_CH0,1<<4);
+
   st_wake_up();
   st_go_idle();
 }
