@@ -316,7 +316,7 @@ inline void trigger_pulse(uint32_t active){
   pit1_state.active_bits = active;  
 #ifdef STEP_PULSE_DELAY
   pit1_state.step_interrupt_status = PULSE_SET;
-  PIT_LDVAL1 = STEP_PULSE_DELAY;
+  PIT_LDVAL1 = STEP_PULSE_DELAY * TICKS_PER_MICROSECOND;
 #else
   STEPPER_PORT(TOR) = active;
   PIT_LDVAL1 = pit1_state.pulse_length;
@@ -330,7 +330,7 @@ void pit1_isr(void){
   STEPPER_PORT(TOR) = pit1_state.active_bits;
 #ifdef STEP_PULSE_DELAY
   if(pit1_state.step_interrupt_status == PULSE_SET){
-    pit1.step_interrupt_status = PULSE_RESET;
+    pit1_state.step_interrupt_status = PULSE_RESET;
     PIT_LDVAL1 = pit1_state.pulse_length;
     PIT_TCTRL1 |= TEN;  
   }
@@ -359,18 +359,20 @@ void st_init()
   DIR_Z_CTRL = STANDARD_OUTPUT;
   STEPPER_DISABLE_CTRL = STANDARD_OUTPUT;
   // Configure PIT module
-  SIM_SCGC6 |= SIM_SCGC6_PIT;
-  PIT_MCR = 0x00;
+  SIM_SCGC6 |= SIM_SCGC6_PIT;  //Enable clock input
+  PIT_MCR = 0x00;              //Enable PIT, keep running in Debug Mode
   // Configure PIT 0 - main interrupt timer
-  PIT_LDVAL0 = 48000000;
+  PIT_LDVAL0 = 48000000;  //Count Down from this number. 
+  // Default to to clock frequency - one full cycle per second.
+
   PIT_TCTRL0 = TEN; // Keep it running at a reasonable speed, but not interrupting 
   // Configure PIT 1 - reset timer
-  PIT_TCTRL1 = TIE;
-  // Start in the idle state, but first wake up to check for keep steppers enabled option.
+  PIT_TCTRL1 = TIE;  //enable interrupts
 
   NVIC_ENABLE_IRQ(IRQ_PIT_CH0);
   NVIC_ENABLE_IRQ(IRQ_PIT_CH1);
 
+  // Start in the idle state, but first wake up to check for keep steppers enabled option.
   st_wake_up();
   st_go_idle();
 }
